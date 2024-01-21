@@ -1,4 +1,0 @@
-[build]
-  command = "npm install && NODE_ENV=production npx sequelize-cli db:migrate"
-  functions = "netlify/functions"
-
