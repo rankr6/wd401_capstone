@@ -20,7 +20,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(cookieParser());
-app.use(bodyParser.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false }));
 app.use(
   session({
@@ -228,16 +228,15 @@ app.post(
   upload.single("blogThumbnail"),
   async (req, res) => {
     try {
+      console.log("Inside createBlog endpoint");
       console.log(req.user.id);
-      
-
       console.log("------------------------------------");
       console.log(req.body);
 
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
-
+      console.log("after image upload");
       // Access the file buffer
       const thumbnailBuffer = req.file.buffer;
       const blogThumbnailBase64 = thumbnailBuffer.toString("base64");
@@ -251,14 +250,26 @@ app.post(
         date: req.body.date,
         userID: req.user.id,
       });
-      console.log(createBlog);
-      return res.json(createBlog);
+      console.log("after blog created to database");
+      // Create a simplified JSON object for the response
+      const simplifiedBlog = {
+        id: createBlog.id,
+        blogTitle: createBlog.blogTitle,
+        blogThumbnail: createBlog.blogThumbnail,
+        blogDescription: createBlog.blogDescription,
+        location: createBlog.location,
+        date: createBlog.date,
+      };
+      console.log("returning json");
+      console.log(simplifiedBlog);
+      return res.json(simplifiedBlog);
     } catch (err) {
-      console.log(err);
+      console.error(err);
       return res.status(401).json({ error: "Invalid or expired token" });
     }
   }
 );
+
 
 app.get("/blogs",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
@@ -299,16 +310,6 @@ app.get("/blogs/:id",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
 
 app.patch("/publisher/blogs/:blogID/:userID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
-    const token = req.cookies.token;
-    if (!token) {
-      return res.status(401).json({ error: "Token not provided" });
-    }
-
-    const decodedToken = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your_jwt_secret"
-    );
-    const userIDFromToken = decodedToken.id;
 
     if (req.user.id.toString() !== req.params.userID.toString()) {
       return res.status(403).json({ error: "Access denied. Invalid user ID." });
@@ -333,32 +334,34 @@ app.patch("/publisher/blogs/:blogID/:userID",connectEnsureLogin.ensureLoggedIn()
   }
 });
 
-app.delete("/publisher/blogs/:blogID/:userID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.delete("/publisher/blogs/:blogID/:userID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
-    const token = req.cookies.token;
-    if (!token) {
-      return res.status(401).json({ error: "Token not provided" });
-    }
-
-    const decodedToken = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your_jwt_secret"
-    );
-    const userIDFromToken = decodedToken.id;
+    
 
     if (req.user.id.toString() !== req.params.userID.toString()) {
       return res.status(403).json({ error: "Access denied. Invalid user ID." });
     }
+
     const userID = req.user.id;
     const blogID = req.params.blogID;
-    console.log(blogID + " user " + userID);
-    await Blog.remove({ blogID, userID });
+
+    // Use the destroy method to delete the blog
+    const deletedBlog = await Blog.destroy({
+      where: { id: blogID, userID: userID },
+    });
+
+    if (deletedBlog === 0) {
+      // The destroy method returns the number of rows affected, so if it's 0, the blog was not found
+      return res.status(404).json({ error: "Blog not found or unauthorized" });
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 app.post("/blog/like/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
