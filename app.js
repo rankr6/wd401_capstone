@@ -2,6 +2,7 @@
 /* eslint-disable no-unused-vars */
 const express = require("express");
 const jwt = require("jsonwebtoken");
+const connectEnsureLogin = require("connect-ensure-login")
 const app = express();
 var cookieParser = require("cookie-parser");
 const { User, Blog, sharedBlog, Comment, SavedBlog } = require("./models");
@@ -14,7 +15,10 @@ const flash = require("connect-flash");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const multer = require("multer");
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true,
+}));
 app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: false }));
@@ -189,7 +193,7 @@ app.post(
   "/session",
   validateUser,
   passport.authenticate("local", {
-    failureRedirect: "/login",
+    failureRedirect: "/",
     failureFlash: true,
   }),
   (request, response) => {
@@ -197,12 +201,6 @@ app.post(
     console.log(userID);
     const user = request.user;
     const token = generateToken(user);
-    response.cookie("token", token, {
-      maxAge: 24 * 60 * 60 * 1000, // Set the cookie expiration time (example: 24 hours)
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "None",
-    });
     response.json({ userID: userID, token });
   }
 );
@@ -225,32 +223,13 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 app.post(
-  "/publisher/createBlog/:userID",
+  "/publisher/createBlog",
+  connectEnsureLogin.ensureLoggedIn(),
   upload.single("blogThumbnail"),
   async (req, res) => {
     try {
-      // Extract user ID from the JWT token in the cookies
-      const token = req.cookies.token;
-      if (!token) {
-        return res.status(401).json({ error: "Token not provided" });
-      }
-
-      const decodedToken = jwt.verify(
-        token,
-        process.env.JWT_SECRET || "your_jwt_secret"
-      );
-      const userIDFromToken = decodedToken.id;
-
-      // Check if the authenticated user matches the requested userID
-      console.log(userIDFromToken + "rank" + req.params.userID);
-      console.log(typeof userIDFromToken);
-      console.log(typeof req.params.userID);
       console.log(req.user.id);
-      if (req.user.id.toString() !== req.params.userID.toString()) {
-        return res
-          .status(403)
-          .json({ error: "Access denied. Invalid user ID." });
-      }
+      
 
       console.log("------------------------------------");
       console.log(req.body);
@@ -272,7 +251,7 @@ app.post(
         date: req.body.date,
         userID: req.user.id,
       });
-      console.log(thumbnailBuffer);
+      console.log(createBlog);
       return res.json(createBlog);
     } catch (err) {
       console.log(err);
@@ -281,7 +260,7 @@ app.post(
   }
 );
 
-app.get("/blogs", async (req, res) => {
+app.get("/blogs",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     // Retrieve all blogs from the database
     const allBlogs = await Blog.findAll();
@@ -305,7 +284,7 @@ app.get("/blogs", async (req, res) => {
   }
 });
 
-app.get("/blogs/:id", async (req, res) => {
+app.get("/blogs/:id",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     // Retrieve all blogs from the database
     const blogID = req.params.id;
@@ -318,7 +297,7 @@ app.get("/blogs/:id", async (req, res) => {
   }
 });
 
-app.patch("/publisher/blogs/:blogID/:userID", async (req, res) => {
+app.patch("/publisher/blogs/:blogID/:userID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const token = req.cookies.token;
     if (!token) {
@@ -354,7 +333,7 @@ app.patch("/publisher/blogs/:blogID/:userID", async (req, res) => {
   }
 });
 
-app.delete("/publisher/blogs/:blogID/:userID", async (req, res) => {
+app.delete("/publisher/blogs/:blogID/:userID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const token = req.cookies.token;
     if (!token) {
@@ -381,7 +360,7 @@ app.delete("/publisher/blogs/:blogID/:userID", async (req, res) => {
   }
 });
 
-app.post("/blog/like/:blogID", async (req, res) => {
+app.post("/blog/like/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const token = req.cookies.token;
     if (!token) {
@@ -407,7 +386,7 @@ app.post("/blog/like/:blogID", async (req, res) => {
   }
 });
 
-app.post("/blog/share/:blogID", async (req, res) => {
+app.post("/blog/share/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     // Generate a unique shareable link
     const blogID = req.params.blogID;
@@ -438,7 +417,7 @@ function generateShareableLink(blogID) {
   return `${baseLink}${blogID}/${uniqueID}`;
 }
 
-app.get("/share/:blogID/:uniqueID", async (req, res) => {
+app.get("/share/:blogID/:uniqueID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const blogID = req.params.blogID;
     const uniqueID = req.params.uniqueID;
@@ -483,7 +462,7 @@ async function validateUniqueID(blogID, uniqueID) {
   }
 }
 
-app.get("/blog/comments/:blogID", async (req, res) => {
+app.get("/blog/comments/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const blogID = req.params.blogID;
 
@@ -507,7 +486,7 @@ app.get("/blog/comments/:blogID", async (req, res) => {
 });
 
 // Post a new comment on a specific blog
-app.post("/blog/comments/:blogID", async (req, res) => {
+app.post("/blog/comments/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const token = req.cookies.token;
     if (!token) {
@@ -537,7 +516,7 @@ app.post("/blog/comments/:blogID", async (req, res) => {
   }
 });
 
-app.post("/user/saveblog/:blogID", async (req, res) => {
+app.post("/user/saveblog/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const token = req.cookies.token;
     if (!token) {
@@ -575,7 +554,7 @@ app.post("/user/saveblog/:blogID", async (req, res) => {
 });
 
 // Retrieve saved blogs for the user
-app.get("/user/savedblogs", async (req, res) => {
+app.get("/user/savedblogs",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const token = req.cookies.token;
     if (!token) {
