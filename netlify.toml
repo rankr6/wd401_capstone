@@ -3,4 +3,5 @@
   functions = "netlify/functions"
 
 [[plugins]]
-  package = "@netlify/plugin-functions-core"
+  package = "netlify-plugin-gatsby-cache"
+
