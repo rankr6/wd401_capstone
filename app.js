@@ -36,9 +36,6 @@ app.use(
     },
   })
 );
-app.use(passport.initialize());
-app.use(passport.session());
-app.use(flash());
 
 const saltRounds = 10;
 
@@ -50,39 +47,39 @@ app.use(express.static(path.join(__dirname + "/public")));
 
 
 
-function validateUser(req, res, done, next) {
-  // validate user (user email, user pass )
-  User.findOne({ where: { email: req.body.email } })
-    .then(async (user) => {
-      const result = await bcrypt.compare(req.body.password, user.password);
-      if (result) {
-        res.cookie(`em`, user.email, {
-          maxAge: 500 * 60 * 60 * 1000,
-          secure: process.env.NODE_ENV === "production", // Set to true if using HTTPS in production
-          httpOnly: true,
-          sameSite: "None",
-        });
-        res.cookie(`ps`, user.password, {
-          maxAge: 500 * 60 * 60 * 1000,
-          secure: process.env.NODE_ENV === "production", // Set to true if using HTTPS in production
-          httpOnly: true,
-          sameSite: "None",
-        });
-        res.cookie(`fn`, user.firstName, {
-          maxAge: 500 * 60 * 60 * 1000,
-          secure: process.env.NODE_ENV === "production", // Set to true if using HTTPS in production
-          httpOnly: true,
-          sameSite: "None",
-        });
-        next();
-      } else {
-        return done(null, false, { message: "Invalid password" });
-      }
-    })
-    .catch((error) => {
-      return next(error);
-    });
-}
+// function validateUser(req, res, done, next) {
+//   // validate user (user email, user pass )
+//   User.findOne({ where: { email: req.body.email } })
+//     .then(async (user) => {
+//       const result = await bcrypt.compare(req.body.password, user.password);
+//       if (result) {
+//         res.cookie(`em`, user.email, {
+//           maxAge: 500 * 60 * 60 * 1000,
+//           secure: process.env.NODE_ENV === "production", // Set to true if using HTTPS in production
+//           httpOnly: true,
+//           sameSite: "None",
+//         });
+//         res.cookie(`ps`, user.password, {
+//           maxAge: 500 * 60 * 60 * 1000,
+//           secure: process.env.NODE_ENV === "production", // Set to true if using HTTPS in production
+//           httpOnly: true,
+//           sameSite: "None",
+//         });
+//         res.cookie(`fn`, user.firstName, {
+//           maxAge: 500 * 60 * 60 * 1000,
+//           secure: process.env.NODE_ENV === "production", // Set to true if using HTTPS in production
+//           httpOnly: true,
+//           sameSite: "None",
+//         });
+//         next();
+//       } else {
+//         return done(null, false, { message: "Invalid password" });
+//       }
+//     })
+//     .catch((error) => {
+//       return next(error);
+//     });
+// }
 
 app.get("/", async function (request, response) {
   const user = request.user;
@@ -166,7 +163,7 @@ app.post("/users", async (request, response) => {
 //user login api endpoint
 
 app.post(
-  "/session",
+  "/signin",
   (req, res) => {
     passport.authenticate("local", { session: false }, (err, user, info) => {
       if (err || !user) {
