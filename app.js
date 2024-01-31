@@ -256,7 +256,7 @@ app.post(
         blogThumbnail: blogThumbnailBase64, // Save the buffer directly to the database
         blogDescription: req.body.blogDescription,
         location: req.body.location,
-        date: req.body.date,
+        date: new Date(),
         userID: req.user.id,
       });
       console.log("after blog created to database");
@@ -280,31 +280,30 @@ app.post(
 );
 
 
-app.get("/blogs",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.get("/blogs", async (req, res) => {
   try {
     // Retrieve all blogs from the database
     const allBlogs = await Blog.findAll();
 
     // Form a response object with the required data
-    const blogsWithImages = allBlogs.map((blog) => ({
-      blogTitle: blog.blogTitle,
-      blogDescription: blog.blogDescription,
-      location: blog.location,
-      date: blog.date,
-      blogThumbnail: blog.blogThumbnail,
-      likes: blog.likes,
-    }));
+    // const blogsWithImages = allBlogs.map((blog) => ({
+    //   blogTitle: blog.blogTitle,
+    //   blogDescription: blog.blogDescription,
+    //   location: blog.location,
+    //   date: blog.date,
+    //   blogThumbnail: blog.blogThumbnail,
+    //   likes: blog.likes,
+    // }));
     //res.json(blogsWithImages);
-    console.log("userID");
-    console.log(req.user.id);
-    res.render("blogs", { blogs: blogsWithImages });
+    const blogsInJSON = allBlogs.map(blog => blog.toJSON());
+    res.json(blogsInJSON)
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-app.get("/blogs/:id",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.get("/blogs/:id", async (req, res) => {
   try {
     // Retrieve all blogs from the database
     const blogID = req.params.id;
@@ -373,18 +372,7 @@ app.delete("/publisher/blogs/:blogID/:userID", connectEnsureLogin.ensureLoggedIn
 
 
 app.post("/blog/like/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
-  try {
-    const token = req.cookies.token;
-    if (!token) {
-      return res.status(401).json({ error: "Token not provided" });
-    }
-
-    const decodedToken = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your_jwt_secret"
-    );
-    const userIDFromToken = decodedToken.id;
-
+  try {    
     const userID = req.user.id;
     const blogID = req.params.blogID;
     console.log("userID: " + userID + "    " + "blogID: " + blogID);
