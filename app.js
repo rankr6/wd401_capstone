@@ -10,7 +10,6 @@ const bodyParser = require("body-parser");
 const path = require("path");
 const passport = require("passport");
 const session = require("express-session");
-const LocalStrategy = require("passport-local");
 const flash = require("connect-flash");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
@@ -48,43 +47,23 @@ app.set("views", path.join(__dirname, "views"));
 
 app.use(express.static(path.join(__dirname + "/public")));
 
-passport.use(
-  new LocalStrategy(
-    {
-      usernameField: "email",
-      passwordField: "password",
-    },
-    (username, password, done) => {
-      User.findOne({ where: { email: username } })
-        .then(async (user) => {
-          const result = await bcrypt.compare(password, user.password);
-          if (result) {
-            return done(null, user);
-          } else {
-            return done(null, false, { message: "Invalid password" });
-          }
-        })
-        .catch((error) => {
-          return done(error);
-        });
-    }
-  )
-);
-
-passport.serializeUser((user, done) => {
-  console.log("Serializing user in session", user.id);
-  done(null, user.id);
-});
-
-passport.deserializeUser((id, done) => {
-  User.findByPk(id)
-    .then((user) => {
-      done(null, user);
-    })
-    .catch((error) => {
-      done(error, null);
+passport.authenticate("local", { session: false }, (err, user, info) => {
+  if (err || !user) {
+    return res.status(400).json({
+      message: info
     });
-});
+  }
+  req.login(user, { session: false }, (err) => {
+    if (err) {
+      res.send(err);
+    } // generate a signed json web token with the contents of user object and return it in the response
+    let sanatisedUser = user.toJSON();
+    delete sanatisedUser["password"];
+    const token = jwt.sign(sanatisedUser, process.env.JWT_SECRET || "your_jwt_secret");
+    return res.json({ user: sanatisedUser, token });
+  });
+})(req, res);
+
 
 function validateUser(req, res, done, next) {
   // validate user (user email, user pass )
@@ -197,7 +176,7 @@ app.post("/users", async (request, response) => {
 app.post(
   "/session",
   validateUser,
-  passport.authenticate("local", {
+  passport.authenticate("jwt", {
     failureRedirect: "/",
     failureFlash: true,
   }),
@@ -211,7 +190,7 @@ app.post(
     console.log(userID);
     const user = request.user;
     const token = generateToken(user);
-    response.json({ userID, firstName, lastName, email, mobileNumber,username, token });
+    response.json({ userID, firstName, lastName, email, mobileNumber, username, token });
   }
 );
 
@@ -234,6 +213,7 @@ const upload = multer({ storage: storage });
 
 app.post(
   "/publisher/createBlog",
+  passport.authenticate("jwt", { session: false }),
   upload.single("blogThumbnail"),
   async (req, res) => {
     try {
@@ -316,7 +296,7 @@ app.get("/blogs/:id", async (req, res) => {
   }
 });
 
-app.patch("/publisher/blogs/:blogID/:userID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.patch("/publisher/blogs/:blogID/:userID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
 
     if (req.user.id.toString() !== req.params.userID.toString()) {
@@ -344,7 +324,7 @@ app.patch("/publisher/blogs/:blogID/:userID",connectEnsureLogin.ensureLoggedIn()
 
 app.delete("/publisher/blogs/:blogID/:userID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
-    
+
 
     if (req.user.id.toString() !== req.params.userID.toString()) {
       return res.status(403).json({ error: "Access denied. Invalid user ID." });
@@ -371,8 +351,8 @@ app.delete("/publisher/blogs/:blogID/:userID", connectEnsureLogin.ensureLoggedIn
 });
 
 
-app.post("/blog/like/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
-  try {    
+app.post("/blog/like/:blogID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+  try {
     const userID = req.user.id;
     const blogID = req.params.blogID;
     console.log("userID: " + userID + "    " + "blogID: " + blogID);
@@ -386,7 +366,7 @@ app.post("/blog/like/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, r
   }
 });
 
-app.post("/blog/share/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.post("/blog/share/:blogID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     // Generate a unique shareable link
     const blogID = req.params.blogID;
@@ -417,7 +397,7 @@ function generateShareableLink(blogID) {
   return `${baseLink}${blogID}/${uniqueID}`;
 }
 
-app.get("/share/:blogID/:uniqueID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.get("/share/:blogID/:uniqueID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const blogID = req.params.blogID;
     const uniqueID = req.params.uniqueID;
@@ -462,7 +442,7 @@ async function validateUniqueID(blogID, uniqueID) {
   }
 }
 
-app.get("/blog/comments/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.get("/blog/comments/:blogID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const blogID = req.params.blogID;
 
@@ -486,7 +466,7 @@ app.get("/blog/comments/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req
 });
 
 // Post a new comment on a specific blog
-app.post("/blog/comments/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.post("/blog/comments/:blogID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const token = req.cookies.token;
     if (!token) {
@@ -516,7 +496,7 @@ app.post("/blog/comments/:blogID",connectEnsureLogin.ensureLoggedIn(), async (re
   }
 });
 
-app.post("/user/saveblog/:blogID",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.post("/user/saveblog/:blogID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const token = req.cookies.token;
     if (!token) {
@@ -554,7 +534,7 @@ app.post("/user/saveblog/:blogID",connectEnsureLogin.ensureLoggedIn(), async (re
 });
 
 // Retrieve saved blogs for the user
-app.get("/user/savedblogs",connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.get("/user/savedblogs", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
   try {
     const token = req.cookies.token;
     if (!token) {
