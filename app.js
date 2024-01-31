@@ -15,13 +15,14 @@ const flash = require("connect-flash");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const multer = require("multer");
-app.use(
-  cors({
-    origin: ['http://localhost:5173', 'https://collaborative-blogging.onrender.com'],
-    credentials: true,
-    exposedHeaders: ["Access-Control-Allow-Headers", "Access-Control-Allow-Methods"],
-  })
-);
+const corsOptions = {
+  origin: ['http://localhost:5173', 'https://blogbyrushikesh.netlify.app'],
+  credentials: true,
+  exposedHeaders: ["Access-Control-Allow-Headers", "Access-Control-Allow-Methods"],
+};
+
+app.use(cors(corsOptions));
+
 
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
@@ -256,7 +257,7 @@ app.post(
         blogThumbnail: blogThumbnailBase64, // Save the buffer directly to the database
         blogDescription: req.body.blogDescription,
         location: req.body.location,
-        date: new Date(),
+        date: new Date().toISOString(),
         userID: req.user.id,
       });
       console.log("after blog created to database");
