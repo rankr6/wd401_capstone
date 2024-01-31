@@ -47,22 +47,7 @@ app.set("views", path.join(__dirname, "views"));
 
 app.use(express.static(path.join(__dirname + "/public")));
 
-passport.authenticate("local", { session: false }, (err, user, info) => {
-  if (err || !user) {
-    return res.status(400).json({
-      message: info
-    });
-  }
-  req.login(user, { session: false }, (err) => {
-    if (err) {
-      res.send(err);
-    } // generate a signed json web token with the contents of user object and return it in the response
-    let sanatisedUser = user.toJSON();
-    delete sanatisedUser["password"];
-    const token = jwt.sign(sanatisedUser, process.env.JWT_SECRET || "your_jwt_secret");
-    return res.json({ user: sanatisedUser, token });
-  });
-})(req, res);
+
 
 
 function validateUser(req, res, done, next) {
@@ -175,22 +160,23 @@ app.post("/users", async (request, response) => {
 
 app.post(
   "/session",
-  validateUser,
-  passport.authenticate("jwt", {
-    failureRedirect: "/",
-    failureFlash: true,
-  }),
-  (request, response) => {
-    const userID = request.user.id;
-    const firstName = request.user.firstName;
-    const lastName = request.user.lastName;
-    const email = request.user.email;
-    const mobileNumber = request.user.mobileNumber;
-    const username = request.user.username;
-    console.log(userID);
-    const user = request.user;
-    const token = generateToken(user);
-    response.json({ userID, firstName, lastName, email, mobileNumber, username, token });
+  (req, res, next) => {
+    passport.authenticate("local", { session: false }, (err, user, info) => {
+      if (err || !user) {
+        return res.status(400).json({
+          message: info
+        });
+      }
+      req.login(user, { session: false }, (err) => {
+        if (err) {
+          res.send(err);
+        } // generate a signed json web token with the contents of user object and return it in the response
+        let sanatisedUser = user.toJSON();
+        delete sanatisedUser["password"];
+        const token = jwt.sign(sanatisedUser, process.env.JWT_SECRET || "your_jwt_secret");
+        return res.json({ user: sanatisedUser, token });
+      });
+    })(req, res);
   }
 );
 
