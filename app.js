@@ -237,7 +237,7 @@ const upload = multer({ storage: storage });
 
 app.post(
   "/publisher/createBlog",
-  passport.authenticate("jwt", { session: false }),
+  passport.authenticate("local", { session: false }),
   upload.single("blogThumbnail"),
   async (req, res) => {
     try {
