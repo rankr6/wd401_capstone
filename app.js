@@ -136,7 +136,7 @@ app.get("/signUp", (request, response) => {
 });
 
 app.get("/login", (request, response) => {
-  response.render("login");
+  response.status(400).json({ error: "authentication is required" });
 });
 
 function generateToken(user) {
