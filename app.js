@@ -26,16 +26,7 @@ app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false }));
-app.use(
-  session({
-    secret: "my key super secret",
-    resave: false, // Set to false to avoid session being saved on every request
-    saveUninitialized: false, // Set to false to avoid saving uninitialized sessions
-    cookie: {
-      maxAge: 24 * 60 * 60 * 1000,
-    },
-  })
-);
+
 
 const saltRounds = 10;
 
