@@ -160,7 +160,7 @@ app.post("/users", async (request, response) => {
 
 app.post(
   "/session",
-  (req, res, next) => {
+  (req, res) => {
     passport.authenticate("local", { session: false }, (err, user, info) => {
       if (err || !user) {
         return res.status(400).json({
