@@ -1,2 +1,4 @@
 node_modules
 publisher.txt
+# Local Netlify folder
+.netlify
