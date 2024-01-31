@@ -154,7 +154,7 @@ app.post("/users", async (request, response) => {
 //user login api endpoint
 
 app.post(
-  "/signin",
+  "/session",
   (req, res) => {
     passport.authenticate("local", { session: false }, (err, user, info) => {
       if (err || !user) {
