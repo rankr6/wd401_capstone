@@ -14,6 +14,7 @@ const flash = require("connect-flash");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const multer = require("multer");
+const LocalStrategy = require("passport-local");
 const corsOptions = {
   origin: ['http://localhost:5173', 'https://blogbyrushikesh.netlify.app'],
   credentials: true,
