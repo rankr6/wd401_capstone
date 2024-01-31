@@ -145,11 +145,18 @@ app.post("/users", async (request, response) => {
       password: hashedpwd,
       username: request.body.username,
     });
-
-    const token = generateToken(user);
-
-    response.json({ user: user, token });
-    console.log({ user: user + " HELLO " + token });
+    request.login(user, { session: false }, (err) => {
+      if (err) {
+        console.log(err);
+      }
+      let sanatisedUser = user.toJSON();
+      delete sanatisedUser["password"];
+      const token = jwt.sign(
+        sanatisedUser,
+        process.env.JWT_SECRET || "your_jwt_secret"
+      );
+      return response.json({ user: sanatisedUser, token });
+    });
   } catch (error) {
     console.log(error);
     response.status(500).json({ error: "Internal Server Error" });
