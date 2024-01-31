@@ -155,7 +155,7 @@ app.post("/users", async (request, response) => {
 
 app.post(
   "/session",
-  (req, res) => {
+  (req, res, next) => {
     passport.authenticate("local", { session: false }, (err, user, info) => {
       if (err || !user) {
         return res.status(400).json({
@@ -171,7 +171,7 @@ app.post(
         const token = jwt.sign(sanatisedUser, process.env.JWT_SECRET || "your_jwt_secret");
         return res.json({ user: sanatisedUser, token });
       });
-    })(req, res);
+    })(req, res, next);
   }
 );
 
