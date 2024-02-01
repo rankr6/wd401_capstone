@@ -41,44 +41,59 @@ app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname + "/public")));
 
 app.use(passport.initialize());
-app.use(passport.session());
+// app.use(passport.session());
 passport.use(
   new LocalStrategy(
     {
       usernameField: "email",
       passwordField: "password",
     },
-    (username, password, done) => {
-      User.findOne({ where: { email: username } })
+    function (email, password, done) {
+      //this one is typically a DB call. Assume that the returned user object is pre-formatted and ready for storing in JWT
+      return User.findOne({ where: { email } })
         .then(async (user) => {
+          if (!user) {
+            return done(null, undefined, {
+              message: "No such user",
+            });
+          }
           const result = await bcrypt.compare(password, user.password);
-          if (result) {
-            return done(null, user);
+          if (!result) {
+            return done(null, false, {
+              message: "Incorrect email or password.",
+            });
           } else {
-            return done(null, false, { message: "Invalid password" });
+            return done(null, user, { message: "Logged In Successfully" });
           }
         })
         .catch((error) => {
-          return error;
+          return done(error);
         });
     }
   )
 );
 
-passport.serializeUser((user, done) => {
-  console.log("Serializing user in session", user.id);
-  done(null, user.id);
-});
-
-passport.deserializeUser((id, done) => {
-  User.findByPk(id)
-    .then((user) => {
-      done(null, user);
-    })
-    .catch((error) => {
-      done(error, null);
-    });
-});
+const passportJWT = require("passport-jwt");
+const JWTStrategy = passportJWT.Strategy;
+const ExtractJWT = passportJWT.ExtractJwt;
+passport.use(
+  new JWTStrategy(
+    {
+      jwtFromRequest: ExtractJWT.fromAuthHeaderAsBearerToken(),
+      secretOrKey: process.env.JWT_SECRET || "your_jwt_secret",
+    },
+    function (jwtPayload, cb) {
+      //find the user in db if needed. This functionality may be omitted if you store everything you'll need in JWT payload.
+      return User.findByPk(jwtPayload.id)
+        .then((user) => {
+          return cb(null, user);
+        })
+        .catch((err) => {
+          return cb(err);
+        });
+    }
+  )
+);
 
 
 // function validateUser(req, res, done, next) {
@@ -237,7 +252,7 @@ const upload = multer({ storage: storage });
 
 app.post(
   "/publisher/createBlog",
-  passport.authenticate("local", { session: false }),
+  passport.authenticate("jwt", { session: false }),
   upload.single("blogThumbnail"),
   async (req, res) => {
     try {
@@ -320,7 +335,7 @@ app.get("/blogs/:id", async (req, res) => {
   }
 });
 
-app.patch("/publisher/blogs/:blogID/:userID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.patch("/publisher/blogs/:blogID/:userID", passport.authenticate("jwt", { session: false }), async (req, res) => {
   try {
 
     if (req.user.id.toString() !== req.params.userID.toString()) {
@@ -346,7 +361,7 @@ app.patch("/publisher/blogs/:blogID/:userID", connectEnsureLogin.ensureLoggedIn(
   }
 });
 
-app.delete("/publisher/blogs/:blogID/:userID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
+app.delete("/publisher/blogs/:blogID/:userID", passport.authenticate("jwt", { session: false }), async (req, res) => {
   try {
 
 
@@ -375,39 +390,41 @@ app.delete("/publisher/blogs/:blogID/:userID", connectEnsureLogin.ensureLoggedIn
 });
 
 
-app.post("/blog/like/:blogID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
-  try {
-    const userID = req.user.id;
-    const blogID = req.params.blogID;
-    console.log("userID: " + userID + "    " + "blogID: " + blogID);
-    // Like the blog
-    const blog = await Blog.likeBlog(blogID, userID);
+app.post("/blog/like/:blogID", passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    try {
+      const userID = req.user.id;
+      const blogID = req.params.blogID;
+      console.log("userID: " + userID + "    " + "blogID: " + blogID);
+      // Like the blog
+      const blog = await Blog.likeBlog(blogID, userID);
 
-    res.json({ success: true, likes: blog.likes });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+      res.json({ success: true, likes: blog.likes });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
 
-app.post("/blog/share/:blogID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
-  try {
-    // Generate a unique shareable link
-    const blogID = req.params.blogID;
-    const shareableLink = generateShareableLink(blogID);
+app.post("/blog/share/:blogID", passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    try {
+      // Generate a unique shareable link
+      const blogID = req.params.blogID;
+      const shareableLink = generateShareableLink(blogID);
 
-    // Store the link in the PostgreSQL database using Sequelize
-    const sharedLink = await sharedBlog.create({
-      blogID: blogID,
-      shareBlogLink: shareableLink,
-    });
+      // Store the link in the PostgreSQL database using Sequelize
+      const sharedLink = await sharedBlog.create({
+        blogID: blogID,
+        shareBlogLink: shareableLink,
+      });
 
-    res.json({ shareableLink });
-  } catch (error) {
-    console.error("Error generating shareable link:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+      res.json({ shareableLink });
+    } catch (error) {
+      console.error("Error generating shareable link:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
 
 function generateUniqueID() {
   return Math.random().toString(36).substring(7);
@@ -421,32 +438,33 @@ function generateShareableLink(blogID) {
   return `${baseLink}${blogID}/${uniqueID}`;
 }
 
-app.get("/share/:blogID/:uniqueID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
-  try {
-    const blogID = req.params.blogID;
-    const uniqueID = req.params.uniqueID;
+app.get("/share/:blogID/:uniqueID", passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    try {
+      const blogID = req.params.blogID;
+      const uniqueID = req.params.uniqueID;
 
-    // Validate the uniqueID (you might have a mechanism to check its validity)
-    const isValidUniqueID = validateUniqueID(blogID, uniqueID);
+      // Validate the uniqueID (you might have a mechanism to check its validity)
+      const isValidUniqueID = validateUniqueID(blogID, uniqueID);
 
-    if (!isValidUniqueID) {
-      return res.status(403).json({ error: "Invalid uniqueID" });
+      if (!isValidUniqueID) {
+        return res.status(403).json({ error: "Invalid uniqueID" });
+      }
+
+      // Retrieve the blog based on the blogID
+      const blog = await Blog.findByPk(blogID);
+
+      if (!blog) {
+        return res.status(404).json({ error: "Blog not found" });
+      }
+
+      // Here, you can render a page or send the blog data as JSON, depending on your needs
+      res.json({ blog });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Internal Server Error" });
     }
-
-    // Retrieve the blog based on the blogID
-    const blog = await Blog.findByPk(blogID);
-
-    if (!blog) {
-      return res.status(404).json({ error: "Blog not found" });
-    }
-
-    // Here, you can render a page or send the blog data as JSON, depending on your needs
-    res.json({ blog });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+  });
 
 async function validateUniqueID(blogID, uniqueID) {
   try {
@@ -466,133 +484,127 @@ async function validateUniqueID(blogID, uniqueID) {
   }
 }
 
-app.get("/blog/comments/:blogID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
-  try {
-    const blogID = req.params.blogID;
+app.get("/blog/comments/:blogID", passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    try {
+      const blogID = req.params.blogID;
 
-    // Retrieve all comments for the specified blog ID
-    const comments = await Comment.findAll({
-      where: { blogID },
-      attributes: ["id", "text", "createdAt"],
-      include: [
-        {
-          model: User,
-          attributes: ["id", "firstName", "lastName"],
-        },
-      ],
-    });
+      // Retrieve all comments for the specified blog ID
+      const comments = await Comment.findAll({
+        where: { blogID },
+        attributes: ["id", "text", "createdAt"],
+        include: [
+          {
+            model: User,
+            attributes: ["id", "firstName", "lastName"],
+          },
+        ],
+      });
 
-    res.json({ comments });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+      res.json({ comments });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
 
 // Post a new comment on a specific blog
-app.post("/blog/comments/:blogID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
-  try {
-    const token = req.cookies.token;
-    if (!token) {
-      return res.status(401).json({ error: "Token not provided" });
+app.post("/blog/comments/:blogID", passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    try {
+      const token = req.cookies.token;
+      if (!token) {
+        return res.status(401).json({ error: "Token not provided" });
+      }
+
+      const decodedToken = jwt.verify(
+        token,
+        process.env.JWT_SECRET || "your_jwt_secret"
+      );
+      const userIDFromToken = decodedToken.id;
+
+      const blogID = req.params.blogID;
+      const { text } = req.body;
+
+      // Create a new comment
+      const comment = await Comment.create({
+        text,
+        userID: req.user.id,
+        blogID,
+      });
+
+      res.json({ comment });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Internal Server Error" });
     }
+  });
 
-    const decodedToken = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your_jwt_secret"
-    );
-    const userIDFromToken = decodedToken.id;
+app.post("/user/saveblog/:blogID", passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    try {
+      const token = req.cookies.token;
+      if (!token) {
+        return res.status(401).json({ error: "Token not provided" });
+      }
 
-    const blogID = req.params.blogID;
-    const { text } = req.body;
+      const decodedToken = jwt.verify(
+        token,
+        process.env.JWT_SECRET || "your_jwt_secret"
+      );
+      const userIDFromToken = decodedToken.id;
 
-    // Create a new comment
-    const comment = await Comment.create({
-      text,
-      userID: req.user.id,
-      blogID,
-    });
+      const blogID = req.params.blogID;
 
-    res.json({ comment });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+      // Check if the blog is already saved by the user
+      const existingSavedBlog = await SavedBlog.findOne({
+        where: { userID: req.user.id, blogID },
+      });
 
-app.post("/user/saveblog/:blogID", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
-  try {
-    const token = req.cookies.token;
-    if (!token) {
-      return res.status(401).json({ error: "Token not provided" });
+      if (existingSavedBlog) {
+        return res.status(400).json({ error: "Blog already saved" });
+      }
+
+      // Save the blog to the user's session
+      const savedBlog = await SavedBlog.create({
+        userID: req.user.id,
+        blogID,
+      });
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Internal Server Error" });
     }
-
-    const decodedToken = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your_jwt_secret"
-    );
-    const userIDFromToken = decodedToken.id;
-
-    const blogID = req.params.blogID;
-
-    // Check if the blog is already saved by the user
-    const existingSavedBlog = await SavedBlog.findOne({
-      where: { userID: req.user.id, blogID },
-    });
-
-    if (existingSavedBlog) {
-      return res.status(400).json({ error: "Blog already saved" });
-    }
-
-    // Save the blog to the user's session
-    const savedBlog = await SavedBlog.create({
-      userID: req.user.id,
-      blogID,
-    });
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+  });
 
 // Retrieve saved blogs for the user
-app.get("/user/savedblogs", connectEnsureLogin.ensureLoggedIn(), async (req, res) => {
-  try {
-    const token = req.cookies.token;
-    if (!token) {
-      return res.status(401).json({ error: "Token not provided" });
+app.get("/user/savedblogs", passport.authenticate("jwt", { session: false }),
+  async (req, res) => {
+    try {
+      
+      // Retrieve all blogs saved by the user
+      const savedBlogs = await SavedBlog.findAll({
+        where: { userID: req.user.id },
+        include: [
+          {
+            model: Blog,
+            attributes: [
+              "id",
+              "blogTitle",
+              "blogDescription",
+              "location",
+              "date",
+            ],
+          },
+        ],
+      });
+
+      res.json({ savedBlogs });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Internal Server Error" });
     }
-
-    const decodedToken = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your_jwt_secret"
-    );
-    const userIDFromToken = decodedToken.id;
-
-    // Retrieve all blogs saved by the user
-    const savedBlogs = await SavedBlog.findAll({
-      where: { userID: req.user.id },
-      include: [
-        {
-          model: Blog,
-          attributes: [
-            "id",
-            "blogTitle",
-            "blogDescription",
-            "location",
-            "date",
-          ],
-        },
-      ],
-    });
-
-    res.json({ savedBlogs });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+  });
 
 module.exports = app;
