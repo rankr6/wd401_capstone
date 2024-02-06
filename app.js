@@ -500,7 +500,7 @@ app.get("/blog/comments/:blogID", passport.authenticate("jwt", { session: false 
           },
         ],
       });
-
+      console.log(comments);
       res.json({ comments });
     } catch (err) {
       console.error(err);
@@ -512,28 +512,18 @@ app.get("/blog/comments/:blogID", passport.authenticate("jwt", { session: false 
 app.post("/blog/comments/:blogID", passport.authenticate("jwt", { session: false }),
   async (req, res) => {
     try {
-      const token = req.cookies.token;
-      if (!token) {
-        return res.status(401).json({ error: "Token not provided" });
-      }
-
-      const decodedToken = jwt.verify(
-        token,
-        process.env.JWT_SECRET || "your_jwt_secret"
-      );
-      const userIDFromToken = decodedToken.id;
 
       const blogID = req.params.blogID;
       const { text } = req.body;
 
       // Create a new comment
-      const comment = await Comment.create({
+      const comments = await Comment.create({
         text,
         userID: req.user.id,
         blogID,
       });
 
-      res.json({ comment });
+      res.json({ comments: comments });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "Internal Server Error" });
