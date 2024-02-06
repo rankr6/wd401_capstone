@@ -433,12 +433,11 @@ function generateUniqueID() {
 function generateShareableLink(blogID) {
   // Modify this function based on your requirements
   // Example: Using a base URL and appending blog ID and a unique identifier
-  const baseLink = "http://localhost:3689/share/";
-  const uniqueID = generateUniqueID();
-  return `${baseLink}${blogID}/${uniqueID}`;
+  const baseLink = `http://localhost:5173/blogs/`;
+  return `${baseLink}${blogID}`;
 }
 
-app.get("/share/:blogID/:uniqueID", passport.authenticate("jwt", { session: false }),
+app.get("/share/:blogID", passport.authenticate("jwt", { session: false }),
   async (req, res) => {
     try {
       const blogID = req.params.blogID;
@@ -533,17 +532,7 @@ app.post("/blog/comments/:blogID", passport.authenticate("jwt", { session: false
 app.post("/user/saveblog/:blogID", passport.authenticate("jwt", { session: false }),
   async (req, res) => {
     try {
-      const token = req.cookies.token;
-      if (!token) {
-        return res.status(401).json({ error: "Token not provided" });
-      }
-
-      const decodedToken = jwt.verify(
-        token,
-        process.env.JWT_SECRET || "your_jwt_secret"
-      );
-      const userIDFromToken = decodedToken.id;
-
+      
       const blogID = req.params.blogID;
 
       // Check if the blog is already saved by the user
