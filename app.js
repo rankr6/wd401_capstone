@@ -1,3 +1,4 @@
+/* eslint-disable no-const-assign */
 /* eslint-disable no-undef */
 /* eslint-disable no-unused-vars */
 const express = require("express");
@@ -260,14 +261,20 @@ app.post(
       console.log(req.user.id);
       console.log("------------------------------------");
       console.log(req.body);
+      let thumbnailBuffer;
 
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
+      if (req.file) {
+        thumbnailBuffer = req.file.buffer;
+      } else {
+        console.log("No image uploaded.");
+        thumbnailBuffer = Buffer.from("No image available!");
       }
-      console.log("after image upload");
+      
+      console.log("After image upload");
+      
       // Access the file buffer
-      const thumbnailBuffer = req.file.buffer;
       const blogThumbnailBase64 = thumbnailBuffer.toString("base64");
+    
 
       // Save the file to the database (assuming you have a model named Blog with a column blogThumbnail of type bytea)
       const createBlog = await Blog.create({

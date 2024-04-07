@@ -17,7 +17,7 @@ module.exports = (sequelize, DataTypes) => {
     }
   }
   sharedBlog.init({
-    shareBlogLink: DataTypes.STRING
+    shareBlogLink: DataTypes.TEXT
   }, {
     sequelize,
     modelName: 'sharedBlog',

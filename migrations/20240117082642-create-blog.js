@@ -10,19 +10,19 @@ module.exports = {
         type: Sequelize.INTEGER
       },
       blogTitle: {
-        type: Sequelize.STRING
+        type: Sequelize.TEXT
       },
       blogThumbnail: {
         type: Sequelize.TEXT
       },
       blogDescription: {
-        type: Sequelize.STRING
+        type: Sequelize.TEXT
       },
       location: {
-        type: Sequelize.STRING
+        type: Sequelize.TEXT
       },
       date: {
-        type: Sequelize.STRING
+        type: Sequelize.TEXT
       },
       createdAt: {
         allowNull: false,

@@ -10,7 +10,7 @@ module.exports = {
         type: Sequelize.INTEGER
       },
       shareBlogLink: {
-        type: Sequelize.STRING
+        type: Sequelize.TEXT
       },
       createdAt: {
         allowNull: false,

@@ -56,11 +56,11 @@ module.exports = (sequelize, DataTypes) => {
   }
   Blog.init(
     {
-      blogTitle: DataTypes.STRING,
+      blogTitle: DataTypes.TEXT,
       blogThumbnail: DataTypes.TEXT,
-      blogDescription: DataTypes.STRING,
-      location: DataTypes.STRING,
-      date: DataTypes.STRING,
+      blogDescription: DataTypes.TEXT,
+      location: DataTypes.TEXT,
+      date: DataTypes.TEXT,
       likes: {
         type: DataTypes.INTEGER,
         defaultValue: 0,
