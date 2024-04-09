@@ -343,6 +343,7 @@ app.get("/blogs/:id", async (req, res) => {
   }
 });
 
+
 app.patch("/publisher/blogs/:blogID/:userID", passport.authenticate("jwt", { session: false }), async (req, res) => {
   try {
 
