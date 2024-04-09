@@ -202,6 +202,7 @@ app.post("/users", async (request, response) => {
         sanatisedUser,
         process.env.JWT_SECRET || "your_jwt_secret"
       );
+      console.log(token);
       return response.json({ user: sanatisedUser, token });
     });
   } catch (error) {
