@@ -270,12 +270,12 @@ app.post(
         console.log("No image uploaded.");
         thumbnailBuffer = Buffer.from("No image available!");
       }
-      
+
       console.log("After image upload");
-      
+
       // Access the file buffer
       const blogThumbnailBase64 = thumbnailBuffer.toString("base64");
-    
+
 
       // Save the file to the database (assuming you have a model named Blog with a column blogThumbnail of type bytea)
       const createBlog = await Blog.create({
@@ -540,7 +540,7 @@ app.post("/blog/comments/:blogID", passport.authenticate("jwt", { session: false
 app.post("/user/saveblog/:blogID", passport.authenticate("jwt", { session: false }),
   async (req, res) => {
     try {
-      
+
       const blogID = req.params.blogID;
 
       // Check if the blog is already saved by the user
@@ -569,7 +569,7 @@ app.post("/user/saveblog/:blogID", passport.authenticate("jwt", { session: false
 app.get("/user/savedblogs", passport.authenticate("jwt", { session: false }),
   async (req, res) => {
     try {
-      
+
       // Retrieve all blogs saved by the user
       const savedBlogs = await SavedBlog.findAll({
         where: { userID: req.user.id },
