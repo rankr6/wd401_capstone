@@ -1,0 +1,45 @@
+name: Automat Docker CI & CD  
+  
+on: [push]
+
+jobs:  
+  run-tests:  
+    runs-on: ubuntu-latest  
+  
+    services:
+      cypress:
+        image: cypress/included:6.5.0
+        options: --shm-size=512m
+        ports:
+          - 3000:3000
+
+    steps:
+      - name: Checkout repository  
+        uses: actions/checkout@v3
+
+      - name: Build Docker image  
+        run: docker-compose build  
+
+      - name: Run app & integration tests
+        run: | 
+          docker-compose up -d
+          docker-compose -f docker-compose.yml exec -T app npx sequelize-cli db:drop  
+          docker-compose -f docker-compose.yml exec -T app npx sequelize-cli db:create  
+          docker-compose -f docker-compose.yml exec -T app npx sequelize-cli db:migrate  
+          docker-compose -f docker-compose.yml exec -T app npm run start &
+          npm install cypress cypress-json-results
+          npx cypress run --env STUDENT_SUBMISSION_URL="http://localhost:3000/"
+      
+          
+      - name: Notify on success  
+        if: success()  
+        run: |  
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"✨ Great News! The CI & CD workflow completed successfully! All tests passed smoothly. :tada:"}' ${{ secrets.SLACK_WEBHOOK_URL }}  
+  
+      - name: Notify on failure  
+        if: failure()  
+        run: |  
+          curl -X POST -H 'Content-type: application/json' --data '{"text":"⚠️ Uh-oh! The CI & CD workflow encountered issues and failed. Immediate attention is needed. :warning:"}' ${{ secrets.SLACK_WEBHOOK_URL }}  
+  
+      - name: Stop and remove Docker containers  
+        run: docker-compose down
