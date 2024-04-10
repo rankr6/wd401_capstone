@@ -22,7 +22,6 @@ const corsOptions = {
   exposedHeaders: ["Access-Control-Allow-Headers", "Access-Control-Allow-Methods"],
 };
 
-
 app.use(cors(corsOptions));
 app.use(session({
   secret: 'your-secret-key',
